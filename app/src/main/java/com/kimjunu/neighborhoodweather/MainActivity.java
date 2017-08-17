@@ -13,20 +13,33 @@ import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.kimjunu.neighborhoodweather.model.weather.Common;
-import com.kimjunu.neighborhoodweather.model.weather.Result;
+import com.kimjunu.neighborhoodweather.model.forecast.Forecast3day;
+import com.kimjunu.neighborhoodweather.model.forecast.ForecastInfo;
+import com.kimjunu.neighborhoodweather.model.weather.Hourly;
 import com.kimjunu.neighborhoodweather.model.weather.Weather;
 import com.kimjunu.neighborhoodweather.model.weather.WeatherInfo;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import butterknife.OnItemClick;
+import butterknife.OnItemLongClick;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -44,6 +57,9 @@ public class MainActivity extends AppCompatActivity {
     double latitude;
     double longitude;
 
+    ArrayList<String> cities = new ArrayList<>();
+    String currentCity = "";
+
     @BindView(R.id.tvLocation)
     TextView tvLocation;
     @BindView(R.id.tvSky)
@@ -54,6 +70,12 @@ public class MainActivity extends AppCompatActivity {
     TextView tvTemperMin;
     @BindView(R.id.tvTemperMax)
     TextView tvTemperMax;
+    @BindView(R.id.layoutTemperature)
+    LinearLayout layoutTemperature;
+    @BindView(R.id.lvForecast)
+    ListView lvForecast;
+    @BindView(R.id.lvCity)
+    ListView lvCity;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,6 +84,8 @@ public class MainActivity extends AppCompatActivity {
         ButterKnife.bind(this);
 
         APIService = WeatherService.retrofit.create(WeatherService.class);
+
+        cities.add("+");
 
         if (checkLocationPermission()) {
             initLocationManager();
@@ -108,13 +132,21 @@ public class MainActivity extends AppCompatActivity {
                     latitude = location.getLatitude();
                     longitude = location.getLongitude();
 
-                    Log.e("location", "[" + location.getProvider() + "] (" + location.getLatitude() + "," + location.getLongitude() + ")");
-
                     // 날짜 선택
-                    tvLocation.setText(getAddressFromLocation(latitude, longitude));
+                    currentCity = getAddressFromLocation(latitude, longitude);
+                    tvLocation.setText(currentCity);
+
+                    if (cities.contains(currentCity) == false)
+                        cities.add(0, currentCity);
+
+                    ArrayAdapter adapter = new ArrayAdapter(MainActivity.this, R.layout.simple_list_item, cities);
+                    lvCity.setAdapter(adapter);
 
                     // 현재 날씨 받아오기
                     getCurrentWeather(latitude, longitude);
+
+                    // 일기 예보 받아오기
+                    getForecast3Days(latitude, longitude);
 
                     locationManager.removeUpdates(locationListener);
                 }
@@ -145,8 +177,7 @@ public class MainActivity extends AppCompatActivity {
 
                 }
             });
-        }
-        else {
+        } else {
             Log.e("GPS Enable", "false");
             runOnUiThread(new Runnable() {
                 @Override
@@ -167,7 +198,8 @@ public class MainActivity extends AppCompatActivity {
                 addresses = geocoder.getFromLocation(latitude, longitude, 1);
 
                 if (addresses != null && addresses.size() > 0) {
-                    address = addresses.get(0).getAddressLine(0);
+                    address = addresses.get(0).getAdminArea() + " " + addresses.get(0).getLocality()
+                            + " " + addresses.get(0).getThoroughfare();
                 }
             }
         } catch (IOException e) {
@@ -177,6 +209,35 @@ public class MainActivity extends AppCompatActivity {
         return address;
     }
 
+    ArrayList<Location> getLocationFromAddress(String address) {
+        ArrayList<Location> locations = new ArrayList<>();
+        Geocoder geocoder = new Geocoder(MainActivity.this);
+        List<Address> addresses = null;
+
+        try {
+            addresses = geocoder.getFromLocationName(address, 5);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if (addresses != null) {
+            for (int i = 0; i < addresses.size(); i++) {
+                Location location = new Location("");
+                double lat = addresses.get(i).getLatitude();
+                double lon = addresses.get(i).getLongitude();
+
+                location.setLatitude(lat);
+                location.setLongitude(lon);
+
+                locations.add(location);
+
+                Log.e("location", lat + " " + lon + ", " + addresses.get(i).getAdminArea() + " " + addresses.get(i).getLocality() + " " + addresses.get(i).getThoroughfare());
+            }
+        }
+
+        return locations;
+    }
+
     void getCurrentWeather(double latitude, double longitude) {
         APIService.getCurrentWeather(1, String.valueOf(latitude), String.valueOf(longitude)).enqueue(new Callback<WeatherInfo>() {
             @Override
@@ -184,32 +245,24 @@ public class MainActivity extends AppCompatActivity {
                 if (response.body() != null) {
                     WeatherInfo body = response.body();
 
-                    Result result = body.result;
-                    Common common = body.common;
+                    assert body != null;
                     Weather weather = body.weather;
-
-                    // API 호출 결과 확인
-                    if (result == null) {
-                        Toast.makeText(MainActivity.this, "No Result.", Toast.LENGTH_SHORT).show();
-
-                        return;
-                    }
-
-                    if (result.code.equals(9200) == false) {
-                        Toast.makeText(MainActivity.this, result.message, Toast.LENGTH_SHORT).show();
-
-                        return;
-                    }
-
-                    // 특보 사항 확인
-                    if (common == null)
-                        Toast.makeText(MainActivity.this, "No Common.", Toast.LENGTH_SHORT).show();
 
                     // 날씨 정보
                     if (weather == null)
                         Toast.makeText(MainActivity.this, "No Weather.", Toast.LENGTH_SHORT).show();
                     else {
+                        if (weather.hourly.isEmpty())
+                            return;
 
+                        Hourly hourly = weather.hourly.get(0);
+                        tvSky.setText(hourly.sky.name);
+                        String temperatureNow = ((int) Double.parseDouble(hourly.temperature.tc)) + "°";
+                        tvTemperNow.setText(temperatureNow);
+                        tvTemperMin.setText(String.valueOf((int) Double.parseDouble(hourly.temperature.tmin)));
+                        tvTemperMax.setText(String.valueOf((int) Double.parseDouble(hourly.temperature.tmax)));
+
+                        layoutTemperature.setVisibility(View.VISIBLE);
                     }
                 } else if (response.errorBody() != null) {
                     String msg = null;
@@ -227,5 +280,93 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(MainActivity.this, "Failed to API calling.", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    void getForecast3Days(double latitude, double longitude) {
+        APIService.getForecast3Days(1, String.valueOf(latitude), String.valueOf(longitude)).enqueue(new Callback<ForecastInfo>() {
+            @Override
+            public void onResponse(Call<ForecastInfo> call, Response<ForecastInfo> response) {
+                if (response.body() != null) {
+                    ForecastInfo body = response.body();
+
+                    assert body != null;
+                    com.kimjunu.neighborhoodweather.model.forecast.Weather weather = body.weather;
+
+                    // 날씨 정보
+                    if (weather == null)
+                        Toast.makeText(MainActivity.this, "No Weather.", Toast.LENGTH_SHORT).show();
+                    else {
+                        if (weather.forecast3days.isEmpty())
+                            return;
+
+                        Forecast3day forecast = weather.forecast3days.get(0);
+
+                        ArrayList<String> forecastInfos = new ArrayList<>();
+
+                        int offsetHour = 3;
+                        int maxHour = 49;
+
+                        Date today = new Date();
+                        SimpleDateFormat sdf = new SimpleDateFormat("MM월 dd일 a hh시");
+
+                        for (int hour = 4; hour <= maxHour; hour += offsetHour) {
+                            Calendar calendar = Calendar.getInstance();
+                            calendar.setTime(today);
+                            calendar.add(Calendar.HOUR, hour);
+
+                            String time = sdf.format(calendar.getTime());
+                            String sky = "";
+                            String temp = "";
+
+                            try {
+                                Field skyField = forecast.fcst3hour.sky.getClass().getField("name" + hour + "hour");
+                                sky = skyField.get(forecast.fcst3hour.sky).toString();
+
+                                Field tempField = forecast.fcst3hour.temperature.getClass().getField("temp" + hour + "hour");
+                                temp = tempField.get(forecast.fcst3hour.temperature).toString();
+                                if (temp.isEmpty() == false)
+                                    temp = String.valueOf((int) Double.parseDouble(temp));
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+
+                            forecastInfos.add(time + ",  " + sky + ",  " + temp + "°");
+                        }
+
+                        ArrayAdapter adapter = new ArrayAdapter(MainActivity.this, R.layout.simple_list_item, forecastInfos);
+                        lvForecast.setAdapter(adapter);
+                    }
+                } else if (response.errorBody() != null) {
+                    String msg = null;
+                    try {
+                        msg = response.errorBody().string();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ForecastInfo> call, Throwable t) {
+                Toast.makeText(MainActivity.this, "Failed to API calling.", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    @OnItemClick(R.id.lvCity)
+    public void onCityItemClick(AdapterView<?> parent, int position) {
+        if (cities.get(position).equals("+")) {
+            // 새 도시 추가
+        } else {
+            // 도시 변경
+        }
+    }
+
+    @OnItemLongClick(R.id.lvCity)
+    public boolean onCityLongClick(AdapterView<?> parent, int position) {
+        Log.e("location", cities.get(position));
+
+        return true;
     }
 }

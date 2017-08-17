@@ -138,5 +138,4 @@ public class Sky {
     @SerializedName("name67hour")
     @Expose
     public String name67hour;
-
 }
