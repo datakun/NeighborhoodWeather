@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    tools:context="com.kimjunu.neighborhoodweather.MainActivity">
+
+    <TextView
+        android:id="@+id/tvLocation"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:gravity="center"
+        android:text="부산, 영도구"
+        android:textSize="32sp" />
+
+    <TextView
+        android:id="@+id/tvSky"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:gravity="center"
+        android:text="맑음"
+        android:textSize="24sp" />
+
+    <TextView
+        android:id="@+id/tvTemperNow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:gravity="center"
+        android:text="27"
+        android:textSize="48sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="right"
+            android:layout_margin="4dp"
+            android:gravity="center"
+            android:text="최저기온:"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tvTemperMin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="right"
+            android:layout_margin="4dp"
+            android:gravity="center"
+            android:text="27"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="right"
+            android:layout_margin="4dp"
+            android:gravity="center"
+            android:text="최고기온:"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tvTemperMax"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="right"
+            android:layout_margin="4dp"
+            android:gravity="center"
+            android:text="27"
+            android:textSize="16sp" />
+
+    </LinearLayout>
+
+</LinearLayout>
