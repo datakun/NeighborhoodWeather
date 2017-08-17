@@ -2,6 +2,7 @@ package com.kimjunu.neighborhoodweather;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
@@ -11,11 +12,15 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -358,8 +363,24 @@ public class MainActivity extends AppCompatActivity {
     public void onCityItemClick(AdapterView<?> parent, int position) {
         if (cities.get(position).equals("+")) {
             // 새 도시 추가
+            showAddAddressDialog();
         } else {
             // 도시 변경
+            ArrayList<Location> locations = getLocationFromAddress(cities.get(position));
+
+            if (locations.isEmpty())
+                return;
+
+            latitude = locations.get(0).getLatitude();
+            longitude = locations.get(0).getLongitude();
+
+            // 현재 날씨 받아오기
+            getCurrentWeather(latitude, longitude);
+
+            // 일기 예보 받아오기
+            getForecast3Days(latitude, longitude);
+
+            tvLocation.setText(cities.get(position));
         }
     }
 
@@ -367,6 +388,109 @@ public class MainActivity extends AppCompatActivity {
     public boolean onCityLongClick(AdapterView<?> parent, int position) {
         Log.e("location", cities.get(position));
 
+        if (position == 0)
+            return false;
+
+        showDeleteAddressDialog(position);
+
         return true;
+    }
+
+    void showAddAddressDialog() {
+        final AlertDialog.Builder alert = new AlertDialog.Builder(this);
+        final EditText etAddress = new EditText(this);
+
+        alert.setTitle("도시 추가");
+        alert.setMessage("주소를 입력하세요\n(예: OO시 OO구 OO동)");
+
+        alert.setView(etAddress);
+
+        alert.setPositiveButton("ok", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                String address = etAddress.getText().toString();
+
+                ArrayList<Location> locations = getLocationFromAddress(address);
+
+                if (locations.isEmpty() == false) {
+                    cities.add(cities.size() - 1, address);
+                }
+            }
+        });
+
+
+        alert.setNegativeButton("no", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+
+            }
+        });
+
+        final AlertDialog dialog = alert.create();
+        dialog.show();
+
+        etAddress.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+                ArrayList<Location> locations = getLocationFromAddress(charSequence.toString());
+
+                if (locations.isEmpty()) {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                            .setEnabled(false);
+                } else {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                            .setEnabled(true);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+
+            }
+        });
+    }
+
+    void showDeleteAddressDialog(final int index) {
+        final AlertDialog.Builder alert = new AlertDialog.Builder(this);
+
+        alert.setTitle("도시 삭제");
+        alert.setMessage(cities.get(index) + " 를 삭제하시겠습니까?");
+
+        alert.setPositiveButton("ok", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                if (cities.get(0).equals(currentCity)) {
+                    ArrayList<Location> locations = getLocationFromAddress(cities.get(0));
+
+                    if (locations.isEmpty())
+                        return;
+
+                    latitude = locations.get(0).getLatitude();
+                    longitude = locations.get(0).getLongitude();
+
+                    // 현재 날씨 받아오기
+                    getCurrentWeather(latitude, longitude);
+
+                    // 일기 예보 받아오기
+                    getForecast3Days(latitude, longitude);
+                }
+
+                cities.remove(index);
+
+                lvCity.getAdapter().notifyAll();
+            }
+        });
+
+
+        alert.setNegativeButton("no", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+
+            }
+        });
+
+        final AlertDialog dialog = alert.create();
+        dialog.show();
     }
 }
