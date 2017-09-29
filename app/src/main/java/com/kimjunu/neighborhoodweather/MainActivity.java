@@ -1,6 +1,7 @@
 package com.kimjunu.neighborhoodweather;
 
 import android.Manifest;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -11,11 +12,11 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.text.Editable;
-import android.text.TextWatcher;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -43,6 +44,7 @@ import java.util.Locale;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import butterknife.OnClick;
 import butterknife.OnItemClick;
 import butterknife.OnItemLongClick;
 import retrofit2.Call;
@@ -65,6 +67,10 @@ public class MainActivity extends AppCompatActivity {
     ArrayList<String> cities = new ArrayList<>();
     String currentCity = "";
 
+    ForecastAdapter mForecastAdapter;
+
+    ProgressDialog mProgressDialog = null;
+
     @BindView(R.id.tvLocation)
     TextView tvLocation;
     @BindView(R.id.tvSky)
@@ -77,8 +83,8 @@ public class MainActivity extends AppCompatActivity {
     TextView tvTemperMax;
     @BindView(R.id.layoutTemperature)
     LinearLayout layoutTemperature;
-    @BindView(R.id.lvForecast)
-    ListView lvForecast;
+    @BindView(R.id.rvForecast)
+    RecyclerView rvForecast;
     @BindView(R.id.lvCity)
     ListView lvCity;
 
@@ -90,7 +96,8 @@ public class MainActivity extends AppCompatActivity {
 
         APIService = WeatherService.retrofit.create(WeatherService.class);
 
-        cities.add("+");
+        mForecastAdapter = new ForecastAdapter();
+        rvForecast.setAdapter(mForecastAdapter);
 
         if (checkLocationPermission()) {
             initLocationManager();
@@ -99,11 +106,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
         if (requestCode == REQUEST_PERMISSION) {
             initLocationManager();
+            getLocationInfo();
         }
     }
 
@@ -128,9 +136,8 @@ public class MainActivity extends AppCompatActivity {
 
     void getLocationInfo() {
         if (isGPSEnabled) {
-            Log.e("GPS Enable", "true");
 
-            final List<String> m_lstProviders = locationManager.getProviders(false);
+            final List<String> providers = locationManager.getProviders(false);
             locationListener = new LocationListener() {
                 @Override
                 public void onLocationChanged(Location location) {
@@ -138,13 +145,13 @@ public class MainActivity extends AppCompatActivity {
                     longitude = location.getLongitude();
 
                     // 날짜 선택
-                    currentCity = getAddressFromLocation(latitude, longitude);
+                    currentCity = getAddressFromLocation(latitude, longitude).getAddressLine(0);
                     tvLocation.setText(currentCity);
 
                     if (cities.contains(currentCity) == false)
-                        cities.add(0, currentCity);
+                        cities.add(currentCity);
 
-                    ArrayAdapter adapter = new ArrayAdapter(MainActivity.this, R.layout.simple_list_item, cities);
+                    ArrayAdapter adapter = new ArrayAdapter(MainActivity.this, R.layout.item_city, cities);
                     lvCity.setAdapter(adapter);
 
                     // 현재 날씨 받아오기
@@ -154,6 +161,9 @@ public class MainActivity extends AppCompatActivity {
                     getForecast3Days(latitude, longitude);
 
                     locationManager.removeUpdates(locationListener);
+
+                    if (mProgressDialog != null && mProgressDialog.isShowing())
+                        mProgressDialog.dismiss();
                 }
 
                 @Override
@@ -175,25 +185,19 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    for (String name : m_lstProviders) {
-                        if (checkLocationPermission())
-                            locationManager.requestLocationUpdates(name, 1000, 5, locationListener);
-                    }
+                    if (providers.isEmpty() == false) {
+                        mProgressDialog = ProgressDialog.show(MainActivity.this, "", "잠시만 기다려주세요.", true);
 
-                }
-            });
-        } else {
-            Log.e("GPS Enable", "false");
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
+                        if (checkLocationPermission())
+                            locationManager.requestLocationUpdates(providers.get(0), 1000, 5, locationListener);
+                    }
                 }
             });
         }
     }
 
-    String getAddressFromLocation(double latitude, double longitude) {
-        String address = "";
+    Address getAddressFromLocation(double latitude, double longitude) {
+        Address address = null;
 
         Geocoder geocoder = new Geocoder(MainActivity.this, Locale.KOREA);
         List<Address> addresses;
@@ -203,8 +207,7 @@ public class MainActivity extends AppCompatActivity {
                 addresses = geocoder.getFromLocation(latitude, longitude, 1);
 
                 if (addresses != null && addresses.size() > 0) {
-                    address = addresses.get(0).getAdminArea() + " " + addresses.get(0).getLocality()
-                            + " " + addresses.get(0).getThoroughfare();
+                    address = addresses.get(0);
                 }
             }
         } catch (IOException e) {
@@ -214,33 +217,20 @@ public class MainActivity extends AppCompatActivity {
         return address;
     }
 
-    ArrayList<Location> getLocationFromAddress(String address) {
-        ArrayList<Location> locations = new ArrayList<>();
+    Address getLocationFromAddress(String addressString) {
         Geocoder geocoder = new Geocoder(MainActivity.this);
-        List<Address> addresses = null;
+        Address address = null;
 
         try {
-            addresses = geocoder.getFromLocationName(address, 5);
+            List<Address> addresses = geocoder.getFromLocationName(addressString, 5);
+
+            if (addresses.isEmpty() == false)
+                address = addresses.get(0);
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        if (addresses != null) {
-            for (int i = 0; i < addresses.size(); i++) {
-                Location location = new Location("");
-                double lat = addresses.get(i).getLatitude();
-                double lon = addresses.get(i).getLongitude();
-
-                location.setLatitude(lat);
-                location.setLongitude(lon);
-
-                locations.add(location);
-
-                Log.e("location", lat + " " + lon + ", " + addresses.get(i).getAdminArea() + " " + addresses.get(i).getLocality() + " " + addresses.get(i).getThoroughfare());
-            }
-        }
-
-        return locations;
+        return address;
     }
 
     void getCurrentWeather(double latitude, double longitude) {
@@ -306,7 +296,7 @@ public class MainActivity extends AppCompatActivity {
 
                         Forecast3day forecast = weather.forecast3days.get(0);
 
-                        ArrayList<String> forecastInfos = new ArrayList<>();
+                        ArrayList<SimpleForecastInfo> forecastInfos = new ArrayList<>();
 
                         int offsetHour = 3;
                         int maxHour = 49;
@@ -335,11 +325,14 @@ public class MainActivity extends AppCompatActivity {
                                 e.printStackTrace();
                             }
 
-                            forecastInfos.add(time + ",  " + sky + ",  " + temp + "°");
+                            forecastInfos.add(new SimpleForecastInfo(time, sky, temp + "°"));
                         }
 
-                        ArrayAdapter adapter = new ArrayAdapter(MainActivity.this, R.layout.simple_list_item, forecastInfos);
-                        lvForecast.setAdapter(adapter);
+                        rvForecast.setHasFixedSize(true);
+
+                        mForecastAdapter.setDataset(forecastInfos);
+
+                        mForecastAdapter.notifyDataSetChanged();
                     }
                 } else if (response.errorBody() != null) {
                     String msg = null;
@@ -359,123 +352,59 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    @OnItemClick(R.id.lvCity)
-    public void onCityItemClick(AdapterView<?> parent, int position) {
-        if (cities.get(position).equals("+")) {
-            // 새 도시 추가
-            showAddAddressDialog();
-        } else {
-            // 도시 변경
-            ArrayList<Location> locations = getLocationFromAddress(cities.get(position));
-
-            if (locations.isEmpty())
-                return;
-
-            latitude = locations.get(0).getLatitude();
-            longitude = locations.get(0).getLongitude();
-
-            // 현재 날씨 받아오기
-            getCurrentWeather(latitude, longitude);
-
-            // 일기 예보 받아오기
-            getForecast3Days(latitude, longitude);
-
-            tvLocation.setText(cities.get(position));
-        }
-    }
-
-    @OnItemLongClick(R.id.lvCity)
-    public boolean onCityLongClick(AdapterView<?> parent, int position) {
-        Log.e("location", cities.get(position));
-
-        if (position == 0)
-            return false;
-
-        showDeleteAddressDialog(position);
-
-        return true;
-    }
-
+    @OnClick(R.id.btnAddCity)
     void showAddAddressDialog() {
         final AlertDialog.Builder alert = new AlertDialog.Builder(this);
         final EditText etAddress = new EditText(this);
+        etAddress.setSingleLine();
 
-        alert.setTitle("도시 추가");
+        alert.setTitle("지역 추가");
         alert.setMessage("주소를 입력하세요\n(예: OO시 OO구 OO동)");
 
         alert.setView(etAddress);
 
-        alert.setPositiveButton("ok", new DialogInterface.OnClickListener() {
+        alert.setPositiveButton("추가", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int whichButton) {
                 String address = etAddress.getText().toString();
 
-                ArrayList<Location> locations = getLocationFromAddress(address);
+                Address location = getLocationFromAddress(address);
 
-                if (locations.isEmpty() == false) {
-                    cities.add(cities.size() - 1, address);
-                }
-            }
-        });
-
-
-        alert.setNegativeButton("no", new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int whichButton) {
+                if (location != null)
+                    cities.add(location.getAddressLine(0));
+                else
+                    Toast.makeText(MainActivity.this, "주소를 찾지못했습니다.", Toast.LENGTH_LONG).show();
 
             }
         });
 
         final AlertDialog dialog = alert.create();
         dialog.show();
-
-        etAddress.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-
-            }
-
-            @Override
-            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                ArrayList<Location> locations = getLocationFromAddress(charSequence.toString());
-
-                if (locations.isEmpty()) {
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                            .setEnabled(false);
-                } else {
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                            .setEnabled(true);
-                }
-            }
-
-            @Override
-            public void afterTextChanged(Editable editable) {
-
-            }
-        });
     }
 
-    void showDeleteAddressDialog(final int index) {
+    @OnItemLongClick(R.id.lvCity)
+    public boolean onCityLongClick(AdapterView<?> parent, int position) {
+        if (position == 0)
+            return true;
+
+        final int index = position;
         final AlertDialog.Builder alert = new AlertDialog.Builder(this);
 
-        alert.setTitle("도시 삭제");
+        alert.setTitle("지역 삭제");
         alert.setMessage(cities.get(index) + " 를 삭제하시겠습니까?");
 
-        alert.setPositiveButton("ok", new DialogInterface.OnClickListener() {
+        alert.setPositiveButton("삭제", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int whichButton) {
-                if (cities.get(0).equals(currentCity)) {
-                    ArrayList<Location> locations = getLocationFromAddress(cities.get(0));
+                Address location = getLocationFromAddress(cities.get(0));
 
-                    if (locations.isEmpty())
-                        return;
+                if (location == null)
+                    return;
 
-                    latitude = locations.get(0).getLatitude();
-                    longitude = locations.get(0).getLongitude();
+                latitude = location.getLatitude();
+                longitude = location.getLongitude();
 
-                    // 현재 날씨 받아오기
-                    getCurrentWeather(latitude, longitude);
+                getCurrentWeather(latitude, longitude);
 
-                    // 일기 예보 받아오기
-                    getForecast3Days(latitude, longitude);
-                }
+                getForecast3Days(latitude, longitude);
 
                 cities.remove(index);
 
@@ -483,14 +412,26 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-
-        alert.setNegativeButton("no", new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int whichButton) {
-
-            }
-        });
-
         final AlertDialog dialog = alert.create();
         dialog.show();
+
+        return true;
+    }
+
+    @OnItemClick(R.id.lvCity)
+    public void onCityItemClick(AdapterView<?> parent, int position) {
+        Address location = getLocationFromAddress(cities.get(position));
+
+        if (location == null)
+            return;
+
+        latitude = location.getLatitude();
+        longitude = location.getLongitude();
+
+        getCurrentWeather(latitude, longitude);
+
+        getForecast3Days(latitude, longitude);
+
+        tvLocation.setText(cities.get(position));
     }
 }
