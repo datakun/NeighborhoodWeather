@@ -41,6 +41,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -258,6 +259,30 @@ public class MainActivity extends AppCompatActivity {
                         tvTemperMax.setText(String.valueOf((int) Double.parseDouble(hourly.temperature.tmax)));
 
                         layoutTemperature.setVisibility(View.VISIBLE);
+
+                        View rootView = getWindow().getDecorView().getRootView();
+
+                        if (hourly.sky.code.equals("SKY_O01"))
+                            // 맑음
+                            rootView.setBackgroundResource(R.mipmap.bg_sunny);
+                        else if (hourly.sky.code.equals("SKY_O02") || hourly.sky.code.equals("SKY_O03") ||
+                                hourly.sky.code.equals("SKY_O07") || hourly.sky.code.equals("SKY_O08")) {
+                            // 흐림
+                            rootView.setBackgroundResource(R.mipmap.bg_cloudy);
+                        }
+                        else if (hourly.sky.code.equals("SKY_O04") || hourly.sky.code.equals("SKY_O06") ||
+                                hourly.sky.code.equals("SKY_O08") || hourly.sky.code.equals("SKY_O10")) {
+                            // 비
+                            rootView.setBackgroundResource(R.mipmap.bg_rainy);
+                        }
+                        else if (hourly.sky.code.equals("SKY_O05") || hourly.sky.code.equals("SKY_O09")) {
+                            // 눈
+                            rootView.setBackgroundResource(R.mipmap.bg_snowy);
+                        }
+                        else {
+                            // 낙뢰
+                            rootView.setBackgroundResource(R.mipmap.bg_lightening);
+                        }
                     }
                 } else if (response.errorBody() != null) {
                     String msg = null;
@@ -373,8 +398,6 @@ public class MainActivity extends AppCompatActivity {
                     cities.add(location.getAddressLine(0));
                 else
                     Toast.makeText(MainActivity.this, "주소를 찾지못했습니다.", Toast.LENGTH_LONG).show();
-
-                lvCity.getAdapter().notifyAll();
             }
         });
 
