@@ -374,6 +374,7 @@ public class MainActivity extends AppCompatActivity {
                 else
                     Toast.makeText(MainActivity.this, "주소를 찾지못했습니다.", Toast.LENGTH_LONG).show();
 
+                lvCity.getAdapter().notifyAll();
             }
         });
 
