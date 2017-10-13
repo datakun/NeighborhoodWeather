@@ -48,9 +48,14 @@ public class SplashActivity extends AppCompatActivity {
         if (requestCode == REQUEST_PERMISSION) {
             if (checkLocationPermission()) {
                 // 퍼미션 허용되어있으면 메인 액티비티 실행
-                Intent intent = new Intent(SplashActivity.this, MainActivity.class);
-                startActivity(intent);
-                finish();
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        Intent intent = new Intent(SplashActivity.this, MainActivity.class);
+                        startActivity(intent);
+                        finish();
+                    }
+                }, 2000);
             }
         }
     }
