@@ -16,12 +16,14 @@
             android:layout_height="wrap_content"
             android:layout_marginLeft="0dp"
             android:layout_marginRight="8dp"
+            android:textColor="@android:color/black"
             android:textSize="24sp" />
 
         <TextView
             android:id="@+id/tvForeTemp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:textColor="@android:color/black"
             android:textSize="24sp" />
 
     </LinearLayout>
@@ -30,6 +32,7 @@
         android:id="@+id/tvForeTime"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:textColor="@android:color/black"
         android:textSize="18sp" />
 
 </LinearLayout>

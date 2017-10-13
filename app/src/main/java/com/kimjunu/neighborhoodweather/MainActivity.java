@@ -398,6 +398,9 @@ public class MainActivity extends AppCompatActivity {
                     cities.add(location.getAddressLine(0));
                 else
                     Toast.makeText(MainActivity.this, "주소를 찾지못했습니다.", Toast.LENGTH_LONG).show();
+
+                ArrayAdapter adapter = (ArrayAdapter) lvCity.getAdapter();
+                adapter.notifyDataSetChanged();
             }
         });
 
