@@ -471,6 +471,8 @@ public class MainActivity extends AppCompatActivity {
 
                 ArrayAdapter adapter = (ArrayAdapter) lvCity.getAdapter();
                 adapter.notifyDataSetChanged();
+
+                updateCityWeather(cities.size() - 1);
             }
         });
         alert.setNegativeButton("취소", new DialogInterface.OnClickListener() {
