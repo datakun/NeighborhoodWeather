@@ -93,6 +93,8 @@ public class MainActivity extends AppCompatActivity {
     @BindView(R.id.lvCity)
     ListView lvCity;
 
+    boolean isExiting = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -112,22 +114,41 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (!mIsExiting) {
+        if (isExiting == false) {
             new Handler().postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    mIsExiting = false;
+                    isExiting = false;
                 }
             }, 2000);
 
             Toast.makeText(this, "앱을 종료하려면 '뒤로' 버튼을 한 번 더 누르세요.",
                     Toast.LENGTH_SHORT).show();
 
-            mIsExiting = true;
+            isExiting = true;
         } else {
             finish();
         }
     }
+
+    //    @Override
+//    public void onBackPressed() {
+//        if (!mIsExiting) {
+//            new Handler().postDelayed(new Runnable() {
+//                @Override
+//                public void run() {
+//                    mIsExiting = false;
+//                }
+//            }, 2000);
+//
+//            Toast.makeText(this, "앱을 종료하려면 '뒤로' 버튼을 한 번 더 누르세요.",
+//                    Toast.LENGTH_SHORT).show();
+//
+//            mIsExiting = true;
+//        } else {
+//            finish();
+//        }
+//    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -170,17 +191,12 @@ public class MainActivity extends AppCompatActivity {
                     latitude = location.getLatitude();
                     longitude = location.getLongitude();
 
-                    // 날짜 선택
                     Address address = getAddressFromLocation(latitude, longitude);
 
-                    if (address == null) {
-                        Toast.makeText(MainActivity.this, "주소를 찾지못했습니다.", Toast.LENGTH_LONG).show();
-
+                    if (address == null)
                         return;
-                    }
 
                     String city;
-
                     String[] temp = address.getAddressLine(0).split(" ");
 
                     if (temp.length >= 3) {
@@ -306,33 +322,32 @@ public class MainActivity extends AppCompatActivity {
 
                         Hourly hourly = weather.hourly.get(0);
                         tvSky.setText(hourly.sky.name);
-                        String temperatureNow = ((int) Double.parseDouble(hourly.temperature.tc)) + "℃";
-                        tvTemperNow.setText(temperatureNow);
-                        tvTemperMin.setText(String.valueOf((int) Double.parseDouble(hourly.temperature.tmin)));
-                        tvTemperMax.setText(String.valueOf((int) Double.parseDouble(hourly.temperature.tmax)));
+                        String temp = ((int) Double.parseDouble(hourly.temperature.tc)) + "℃";
+                        String tempMin = ((int) Double.parseDouble(hourly.temperature.tmin)) + "℃";
+                        String tempMax = ((int) Double.parseDouble(hourly.temperature.tmax)) + "℃";
+                        tvTemperNow.setText(temp);
+                        tvTemperMin.setText(tempMin);
+                        tvTemperMax.setText(tempMax);
 
                         layoutTemperature.setVisibility(View.VISIBLE);
 
                         View rootView = getWindow().getDecorView().getRootView();
 
-                        if (hourly.sky.code.equals("SKY_O01"))
+                        if (hourly.sky.code.equals("SKY_O01")) {
                             // 맑음
                             rootView.setBackgroundResource(R.mipmap.bg_sunny);
-                        else if (hourly.sky.code.equals("SKY_O02") || hourly.sky.code.equals("SKY_O03") ||
-                                hourly.sky.code.equals("SKY_O07") || hourly.sky.code.equals("SKY_O08")) {
+                        } else if (hourly.sky.code.equals("SKY_O02") || hourly.sky.code.equals("SKY_O03") ||
+                                hourly.sky.code.equals("SKY_O07")) {
                             // 흐림
                             rootView.setBackgroundResource(R.mipmap.bg_cloudy);
-                        }
-                        else if (hourly.sky.code.equals("SKY_O04") || hourly.sky.code.equals("SKY_O06") ||
+                        } else if (hourly.sky.code.equals("SKY_O04") || hourly.sky.code.equals("SKY_O06") ||
                                 hourly.sky.code.equals("SKY_O08") || hourly.sky.code.equals("SKY_O10")) {
                             // 비
                             rootView.setBackgroundResource(R.mipmap.bg_rainy);
-                        }
-                        else if (hourly.sky.code.equals("SKY_O05") || hourly.sky.code.equals("SKY_O09")) {
+                        } else if (hourly.sky.code.equals("SKY_O05") || hourly.sky.code.equals("SKY_O09")) {
                             // 눈
                             rootView.setBackgroundResource(R.mipmap.bg_snowy);
-                        }
-                        else {
+                        } else {
                             // 낙뢰
                             rootView.setBackgroundResource(R.mipmap.bg_lightening);
                         }
@@ -398,12 +413,12 @@ public class MainActivity extends AppCompatActivity {
                                 Field tempField = forecast.fcst3hour.temperature.getClass().getField("temp" + hour + "hour");
                                 temp = tempField.get(forecast.fcst3hour.temperature).toString();
                                 if (temp.isEmpty() == false)
-                                    temp = String.valueOf((int) Double.parseDouble(temp));
+                                    temp = String.valueOf((int) Double.parseDouble(temp)) + "℃";
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
 
-                            forecastInfos.add(new SimpleForecastInfo(time, sky, temp + "℃"));
+                            forecastInfos.add(new SimpleForecastInfo(time, sky, temp));
                         }
 
                         rvForecast.setHasFixedSize(true);
@@ -447,14 +462,10 @@ public class MainActivity extends AppCompatActivity {
 
                 Address location = getLocationFromAddress(address);
 
-                if (location == null) {
-                    Toast.makeText(MainActivity.this, "주소를 찾지못했습니다.", Toast.LENGTH_LONG).show();
-
+                if (address == null)
                     return;
-                }
 
                 String city;
-
                 String[] temp = location.getAddressLine(0).split(" ");
 
                 if (temp.length >= 3) {
@@ -491,8 +502,8 @@ public class MainActivity extends AppCompatActivity {
         updateCityWeather(position);
     }
 
-    public void updateCityWeather(int cityIndex) {
-        Address location = getLocationFromAddress(cities.get(cityIndex));
+    public void updateCityWeather(int position) {
+        Address location = getLocationFromAddress(cities.get(position));
 
         if (location == null)
             return;
@@ -504,7 +515,7 @@ public class MainActivity extends AppCompatActivity {
 
         getForecast3Days(latitude, longitude);
 
-        tvLocation.setText(cities.get(cityIndex));
+        tvLocation.setText(cities.get(position));
     }
 
     @OnItemLongClick(R.id.lvCity)
