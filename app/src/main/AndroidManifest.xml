@@ -15,7 +15,8 @@
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
-            android:screenOrientation="landscape">
+            android:screenOrientation="landscape"
+            android:launchMode="singleTop">
         </activity>
         <activity android:name=".SplashActivity"
             android:screenOrientation="landscape">
