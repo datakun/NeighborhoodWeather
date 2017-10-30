@@ -1,6 +1,10 @@
 package com.kimjunu.neighborhoodweather;
 
 import android.Manifest;
+import android.app.AlarmManager;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -34,7 +38,6 @@ import com.kimjunu.neighborhoodweather.model.weather.Hourly;
 import com.kimjunu.neighborhoodweather.model.weather.Weather;
 import com.kimjunu.neighborhoodweather.model.weather.WeatherInfo;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
@@ -43,7 +46,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -56,6 +58,7 @@ import retrofit2.Response;
 
 public class MainActivity extends AppCompatActivity {
     final int REQUEST_PERMISSION = 1000;
+    final int NOTIFICATION_WEATHER = 1100;
 
     WeatherService APIService;
     LocationManager locationManager;
@@ -75,6 +78,8 @@ public class MainActivity extends AppCompatActivity {
     ForecastAdapter mForecastAdapter;
 
     ProgressDialog mProgressDialog = null;
+
+    AlarmManager mAlarmManager;
 
     @BindView(R.id.tvLocation)
     TextView tvLocation;
@@ -351,6 +356,8 @@ public class MainActivity extends AppCompatActivity {
                             // 낙뢰
                             rootView.setBackgroundResource(R.mipmap.bg_lightening);
                         }
+
+                        setNotification(currentCity, hourly.sky.name, temp);
                     }
                 } else if (response.errorBody() != null) {
                     String msg = null;
@@ -549,5 +556,26 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
 
         return true;
+    }
+
+    public void setNotification(String city, String sky, String temper) {
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
+                new Intent(this, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
+
+        Notification.Builder mBuilder = new Notification.Builder(this);
+        mBuilder.setSmallIcon(R.mipmap.neighborhood_weather_icon)
+                .setWhen(System.currentTimeMillis())
+                .setContentTitle(city)
+                .setContentText(sky + ", " + temper)
+                .setContentIntent(pendingIntent);
+
+        mBuilder.setPriority(Notification.PRIORITY_MAX);
+
+        Notification noti = mBuilder.build();
+        noti.flags |= Notification.FLAG_NO_CLEAR;
+
+        assert nm != null;
+        nm.notify(NOTIFICATION_WEATHER, noti);
     }
 }
