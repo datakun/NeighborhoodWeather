@@ -6,15 +6,18 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.ProgressDialog;
+import android.app.TimePickerDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
@@ -27,9 +30,11 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.TimePicker;
 import android.widget.Toast;
 
 import com.kimjunu.neighborhoodweather.model.forecast.Forecast3day;
@@ -77,9 +82,8 @@ public class MainActivity extends AppCompatActivity {
 
     ForecastAdapter mForecastAdapter;
 
-    ProgressDialog mProgressDialog = null;
-
     AlarmManager mAlarmManager;
+    long mAlarmTriggerTime = 0;
 
     @BindView(R.id.tvLocation)
     TextView tvLocation;
@@ -97,14 +101,24 @@ public class MainActivity extends AppCompatActivity {
     RecyclerView rvForecast;
     @BindView(R.id.lvCity)
     ListView lvCity;
-
-    boolean isExiting = false;
+    @BindView(R.id.btnAlarm)
+    ImageView btnAlarm;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
+
+        mAlarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
+        SharedPreferences sharedPref = getSharedPreferences("com.kimjunu.neighborhoodweather", Context.MODE_PRIVATE);
+        mAlarmTriggerTime = sharedPref.getLong("alarm_trigger_time", 0);
+
+        if (mAlarmTriggerTime == 0)
+            btnAlarm.setImageResource(R.drawable.ic_alarm_add);
+        else
+            btnAlarm.setImageResource(R.drawable.ic_alarm_on);
 
         APIService = WeatherService.retrofit.create(WeatherService.class);
 
@@ -119,41 +133,22 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (isExiting == false) {
+        if (mIsExiting == false) {
             new Handler().postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    isExiting = false;
+                    mIsExiting = false;
                 }
             }, 2000);
 
             Toast.makeText(this, "앱을 종료하려면 '뒤로' 버튼을 한 번 더 누르세요.",
                     Toast.LENGTH_SHORT).show();
 
-            isExiting = true;
+            mIsExiting = true;
         } else {
             finish();
         }
     }
-
-    //    @Override
-//    public void onBackPressed() {
-//        if (!mIsExiting) {
-//            new Handler().postDelayed(new Runnable() {
-//                @Override
-//                public void run() {
-//                    mIsExiting = false;
-//                }
-//            }, 2000);
-//
-//            Toast.makeText(this, "앱을 종료하려면 '뒤로' 버튼을 한 번 더 누르세요.",
-//                    Toast.LENGTH_SHORT).show();
-//
-//            mIsExiting = true;
-//        } else {
-//            finish();
-//        }
-//    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -165,7 +160,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    boolean checkLocationPermission() {
+    public boolean checkLocationPermission() {
         if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                 && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
@@ -177,16 +172,15 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    void initLocationManager() {
+    public void initLocationManager() {
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         isGPSEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
         isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
     }
 
-    void getLocationInfo() {
+    public void getLocationInfo() {
         if (isGPSEnabled) {
-
             final List<String> providers = locationManager.getProviders(false);
             locationListener = new LocationListener() {
                 @Override
@@ -232,9 +226,6 @@ public class MainActivity extends AppCompatActivity {
                     // 일기 예보 받아오기
                     getForecast3Days(latitude, longitude);
 
-                    if (mProgressDialog != null && mProgressDialog.isShowing())
-                        mProgressDialog.dismiss();
-
                     adapter.notifyDataSetChanged();
                 }
 
@@ -254,20 +245,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             };
 
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if (providers.isEmpty() == false) {
-                        mProgressDialog = ProgressDialog.show(MainActivity.this, "", "잠시만 기다려주세요.", true);
-
-                        if (checkLocationPermission()) {
-                            for (String provider : providers) {
-                                locationManager.requestLocationUpdates(provider, 1000, 5, locationListener);
-                            }
-                        }
-                    }
+            if (checkLocationPermission()) {
+                for (String provider : providers) {
+                    locationManager.requestLocationUpdates(provider, 1000, 5, locationListener);
                 }
-            });
+            }
         }
     }
 
@@ -577,5 +559,91 @@ public class MainActivity extends AppCompatActivity {
 
         assert nm != null;
         nm.notify(NOTIFICATION_WEATHER, noti);
+    }
+
+    @OnClick(R.id.btnAlarm)
+    public void showSetAlarmDialog() {
+        Calendar time = Calendar.getInstance();
+
+        if (mAlarmTriggerTime == 0)
+            time.setTimeInMillis(System.currentTimeMillis());
+        else
+            time.setTimeInMillis(mAlarmTriggerTime);
+
+        int hour = time.get(Calendar.HOUR_OF_DAY);
+        int minute = time.get(Calendar.MINUTE);
+
+        TimePickerDialog dialog = new TimePickerDialog(MainActivity.this, new TimePickerDialog.OnTimeSetListener() {
+            @Override
+            public void onTimeSet(TimePicker timePicker, int i, int i1) {
+                cancelAlarm();
+
+                Intent intent = new Intent(MainActivity.this, AlarmReceiver.class);
+                PendingIntent pIntent = PendingIntent.getBroadcast(MainActivity.this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+                long atime = System.currentTimeMillis();
+
+                Calendar curTime = Calendar.getInstance();
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    curTime.set(Calendar.HOUR_OF_DAY, timePicker.getHour());
+                    curTime.set(Calendar.MINUTE, timePicker.getMinute());
+                } else {
+                    curTime.set(Calendar.HOUR_OF_DAY, timePicker.getCurrentHour());
+                    curTime.set(Calendar.MINUTE, timePicker.getCurrentMinute());
+                }
+                curTime.set(Calendar.SECOND, 0);
+                curTime.set(Calendar.MILLISECOND, 0);
+
+                long btime = curTime.getTimeInMillis();
+                mAlarmTriggerTime = btime;
+
+                if (atime > btime)
+                    mAlarmTriggerTime += 1000 * 60 * 60 * 24;
+
+//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//                    mAlarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, pIntent);
+//                } else {
+//                    mAlarmManager.setExact(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, pIntent);
+//                }
+
+//                mAlarmManager.setAlarmClock(new AlarmManager.AlarmClockInfo(mAlarmTriggerTime, pIntent), pIntent);
+
+                mAlarmManager.setRepeating(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, AlarmManager.INTERVAL_DAY, pIntent);
+
+                btnAlarm.setImageResource(R.drawable.ic_alarm_on);
+
+                SharedPreferences sharedPref = getSharedPreferences("com.kimjunu.neighborhoodweather", Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = sharedPref.edit();
+                editor.putLong("alarm_trigger_time", mAlarmTriggerTime);
+                editor.commit();
+            }
+        }, hour, minute, false);
+        dialog.updateTime(hour, minute);
+        dialog.setButton(DialogInterface.BUTTON_NEGATIVE, "해제", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                cancelAlarm();
+
+                mAlarmTriggerTime = 0;
+
+                btnAlarm.setImageResource(R.drawable.ic_alarm_add);
+
+                SharedPreferences sharedPref = getSharedPreferences("com.kimjunu.neighborhoodweather", Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = sharedPref.edit();
+                editor.putLong("alarm_trigger_time", mAlarmTriggerTime);
+                editor.commit();
+            }
+        });
+        dialog.setButton(DialogInterface.BUTTON_POSITIVE, "알람 설정", dialog);
+
+        dialog.show();
+    }
+
+    public void cancelAlarm() {
+        Intent intent = new Intent(MainActivity.this, AlarmReceiver.class);
+        PendingIntent pIntent = PendingIntent.getBroadcast(MainActivity.this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        mAlarmManager.cancel(pIntent);
     }
 }
