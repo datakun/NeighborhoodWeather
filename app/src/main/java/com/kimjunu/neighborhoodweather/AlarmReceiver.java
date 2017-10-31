@@ -34,6 +34,7 @@ import retrofit2.Response;
 
 public class AlarmReceiver extends BroadcastReceiver {
     final int REQUEST_PERMISSION = 1000;
+    final int NOTIFICATION_WEATHER = 1100;
     final int NOTIFICATION_WEATHER_ONCE = 1200;
 
     WeatherService APIService;
@@ -49,12 +50,14 @@ public class AlarmReceiver extends BroadcastReceiver {
     String currentCity = "";
 
     Context mContext = null;
+    Intent mIntent = null;
 
     private static PowerManager.WakeLock sCpuWakeLock;
 
     @Override
     public void onReceive(Context context, Intent intent) {
         mContext = context;
+        mIntent = intent;
         APIService = WeatherService.retrofit.create(WeatherService.class);
 
         if (checkLocationPermission()) {
@@ -98,16 +101,22 @@ public class AlarmReceiver extends BroadcastReceiver {
                     if (address == null)
                         return;
 
+                    String city;
                     String[] temp = address.getAddressLine(0).split(" ");
 
                     if (temp.length >= 3) {
                         if (temp[0].equals("대한민국"))
-                            currentCity = temp[1] + " " + temp[2] + " " + temp[3];
+                            city = temp[1] + " " + temp[2] + " " + temp[3];
                         else
-                            currentCity = temp[0] + " " + temp[1] + " " + temp[2];
+                            city = temp[0] + " " + temp[1] + " " + temp[2];
                     } else {
-                        currentCity = address.getAddressLine(0);
+                        city = address.getAddressLine(0);
                     }
+
+                    if (currentCity.equals(city))
+                        return;
+
+                    currentCity = city;
 
                     // 현재 날씨 받아오기
                     getCurrentWeather(latitude, longitude);
@@ -190,39 +199,63 @@ public class AlarmReceiver extends BroadcastReceiver {
     }
 
     public void setNotification(String city, String sky, String temper) {
-        NotificationManager notificationmanager = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
-        PendingIntent pendingIntent = PendingIntent.getActivity(mContext, 0, new Intent(mContext, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
-        Notification.Builder builder = new Notification.Builder(mContext);
-        builder.setSmallIcon(R.mipmap.neighborhood_weather_icon)
-                .setWhen(System.currentTimeMillis())
-                .setContentTitle("날씨 알람")
-                .setContentText(city)
-                .setSubText(sky + ", " + temper)
-                .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
-                .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .setPriority(Notification.PRIORITY_MAX);
+        Bundle extra = mIntent.getExtras();
 
-        assert notificationmanager != null;
-        notificationmanager.notify(NOTIFICATION_WEATHER_ONCE, builder.build());
+        assert extra != null;
+        if (extra.getBoolean("isRepeat", false)) {
+            NotificationManager nm = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+            PendingIntent pendingIntent = PendingIntent.getActivity(mContext, 0,
+                    new Intent(mContext, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
 
-        if (sCpuWakeLock != null)
-            return;
+            Notification.Builder mBuilder = new Notification.Builder(mContext);
+            mBuilder.setSmallIcon(R.mipmap.neighborhood_weather_icon)
+                    .setWhen(System.currentTimeMillis())
+                    .setContentTitle(city)
+                    .setContentText(sky + ", " + temper)
+                    .setContentIntent(pendingIntent);
 
-        PowerManager pm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
+            mBuilder.setPriority(Notification.PRIORITY_MAX);
 
-        assert pm != null;
-        sCpuWakeLock = pm.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK |
-                        PowerManager.ACQUIRE_CAUSES_WAKEUP |
-                        PowerManager.ON_AFTER_RELEASE, "weather_notificatio");
+            Notification noti = mBuilder.build();
+            noti.flags |= Notification.FLAG_NO_CLEAR;
 
-        sCpuWakeLock.acquire(10*60*1000L /*10 minutes*/);
+            assert nm != null;
+            nm.notify(NOTIFICATION_WEATHER, noti);
+        } else {
+            NotificationManager notificationmanager = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+            PendingIntent pendingIntent = PendingIntent.getActivity(mContext, 0, new Intent(mContext, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
+            Notification.Builder builder = new Notification.Builder(mContext);
+            builder.setSmallIcon(R.mipmap.neighborhood_weather_icon)
+                    .setWhen(System.currentTimeMillis())
+                    .setContentTitle("날씨 알람")
+                    .setContentText(city)
+                    .setSubText(sky + ", " + temper)
+                    .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
+                    .setPriority(Notification.PRIORITY_MAX);
+
+            assert notificationmanager != null;
+            notificationmanager.notify(NOTIFICATION_WEATHER_ONCE, builder.build());
+
+            if (sCpuWakeLock != null)
+                return;
+
+            PowerManager pm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
+
+            assert pm != null;
+            sCpuWakeLock = pm.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK |
+                            PowerManager.ACQUIRE_CAUSES_WAKEUP |
+                            PowerManager.ON_AFTER_RELEASE, "weather_notificatio");
+
+            sCpuWakeLock.acquire(10*60*1000L /*10 minutes*/);
 
 
-        if (sCpuWakeLock != null) {
-            sCpuWakeLock.release();
-            sCpuWakeLock = null;
+            if (sCpuWakeLock != null) {
+                sCpuWakeLock.release();
+                sCpuWakeLock = null;
+            }
         }
     }
 }

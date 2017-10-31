@@ -339,7 +339,11 @@ public class MainActivity extends AppCompatActivity {
                             rootView.setBackgroundResource(R.mipmap.bg_lightening);
                         }
 
-                        setNotification(currentCity, hourly.sky.name, temp);
+                        Intent intent = new Intent(MainActivity.this, AlarmReceiver.class);
+                        intent.putExtra("isRepeat", true);
+                        PendingIntent pIntent = PendingIntent.getBroadcast(MainActivity.this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+                        mAlarmManager.setRepeating(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, AlarmManager.INTERVAL_HALF_HOUR, pIntent);
                     }
                 } else if (response.errorBody() != null) {
                     String msg = null;
@@ -538,27 +542,6 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
 
         return true;
-    }
-
-    public void setNotification(String city, String sky, String temper) {
-        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
-                new Intent(this, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
-
-        Notification.Builder mBuilder = new Notification.Builder(this);
-        mBuilder.setSmallIcon(R.mipmap.neighborhood_weather_icon)
-                .setWhen(System.currentTimeMillis())
-                .setContentTitle(city)
-                .setContentText(sky + ", " + temper)
-                .setContentIntent(pendingIntent);
-
-        mBuilder.setPriority(Notification.PRIORITY_MAX);
-
-        Notification noti = mBuilder.build();
-        noti.flags |= Notification.FLAG_NO_CLEAR;
-
-        assert nm != null;
-        nm.notify(NOTIFICATION_WEATHER, noti);
     }
 
     @OnClick(R.id.btnAlarm)
