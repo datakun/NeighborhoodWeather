@@ -339,11 +339,13 @@ public class MainActivity extends AppCompatActivity {
                             rootView.setBackgroundResource(R.mipmap.bg_lightening);
                         }
 
+                        cancelAlarm();
+
                         Intent intent = new Intent(MainActivity.this, AlarmReceiver.class);
                         intent.putExtra("isRepeat", true);
                         PendingIntent pIntent = PendingIntent.getBroadcast(MainActivity.this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
 
-                        mAlarmManager.setRepeating(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, AlarmManager.INTERVAL_HALF_HOUR, pIntent);
+                        mAlarmManager.setRepeating(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, AlarmManager.INTERVAL_HOUR, pIntent);
                     }
                 } else if (response.errorBody() != null) {
                     String msg = null;
@@ -583,14 +585,6 @@ public class MainActivity extends AppCompatActivity {
 
                 if (atime > btime)
                     mAlarmTriggerTime += 1000 * 60 * 60 * 24;
-
-//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//                    mAlarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, pIntent);
-//                } else {
-//                    mAlarmManager.setExact(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, pIntent);
-//                }
-
-//                mAlarmManager.setAlarmClock(new AlarmManager.AlarmClockInfo(mAlarmTriggerTime, pIntent), pIntent);
 
                 mAlarmManager.setRepeating(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, AlarmManager.INTERVAL_DAY, pIntent);
 

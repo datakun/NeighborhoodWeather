@@ -221,6 +221,8 @@ public class AlarmReceiver extends BroadcastReceiver {
 
             assert nm != null;
             nm.notify(NOTIFICATION_WEATHER, noti);
+
+            Log.e("Repeat", city + ", " + sky + ", " + temper);
         } else {
             NotificationManager notificationmanager = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
             PendingIntent pendingIntent = PendingIntent.getActivity(mContext, 0, new Intent(mContext, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
