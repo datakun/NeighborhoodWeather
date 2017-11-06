@@ -339,13 +339,30 @@ public class MainActivity extends AppCompatActivity {
                             rootView.setBackgroundResource(R.mipmap.bg_lightening);
                         }
 
-                        cancelAlarm();
+                        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                        PendingIntent pendingIntent = PendingIntent.getActivity(MainActivity.this, 0,
+                                new Intent(MainActivity.this, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
+
+                        Notification.Builder mBuilder = new Notification.Builder(MainActivity.this);
+                        mBuilder.setSmallIcon(R.mipmap.neighborhood_weather_icon)
+                                .setWhen(System.currentTimeMillis())
+                                .setContentTitle(currentCity)
+                                .setContentText(hourly.sky.name + ", " + temp)
+                                .setContentIntent(pendingIntent);
+
+                        mBuilder.setPriority(Notification.PRIORITY_MAX);
+
+                        Notification noti = mBuilder.build();
+                        noti.flags |= Notification.FLAG_NO_CLEAR;
+
+                        assert nm != null;
+                        nm.notify(NOTIFICATION_WEATHER, noti);
 
                         Intent intent = new Intent(MainActivity.this, AlarmReceiver.class);
                         intent.putExtra("isRepeat", true);
                         PendingIntent pIntent = PendingIntent.getBroadcast(MainActivity.this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
 
-                        mAlarmManager.setRepeating(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime, AlarmManager.INTERVAL_HOUR, pIntent);
+                        mAlarmManager.setRepeating(AlarmManager.RTC_WAKEUP, mAlarmTriggerTime + AlarmManager.INTERVAL_HOUR, AlarmManager.INTERVAL_HOUR, pIntent);
                     }
                 } else if (response.errorBody() != null) {
                     String msg = null;

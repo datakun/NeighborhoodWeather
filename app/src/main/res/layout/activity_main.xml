@@ -135,8 +135,8 @@
 
             <ImageView
                 android:id="@+id/btnAddCity"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:layout_margin="8dp"
                 android:tint="@android:color/white"
                 android:scaleType="fitCenter"
@@ -147,8 +147,8 @@
 
             <ImageView
                 android:id="@+id/btnAlarm"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:layout_margin="8dp"
                 android:tint="@android:color/white"
                 android:scaleType="fitCenter"
